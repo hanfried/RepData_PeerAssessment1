@@ -8,6 +8,7 @@ output:
 
 ## Loading and preprocessing the data
 
+1. Load the data
 ```{r loading_the_data,echo=TRUE}
 download.file(
   "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",
@@ -22,16 +23,47 @@ Let's take a short look on the loaded data:
 ```{r short_look_to_loaded_data,echo=TRUE}
 dim(activity)
 head(activity)
+str(activity)
 ```
 
-
+2. Process the data into a format suitable for your analysis
+```{r pre_process_the_data_into_suitable_format}
+library(dplyr,warn.conflicts = FALSE)
+library(lubridate)
+library(ggplot2)
+activity <- mutate(activity,date = ymd(date))
+```
 
 ## What is mean total number of steps taken per day?
 
+1. Calculate the total number of steps taken per day
 
 
+```{r calculate_steps_by_day,echo=TRUE}
+steps_by_day <- activity %>%
+  group_by(date) %>%
+  summarize(total_steps = sum(steps,na.rm=TRUE))
+```
+
+2. Make a histogram of the total number of steps each day
+```{r histogrom_steps_by_day,echo=TRUE}
+ggplot(steps_by_day,aes(total_steps)) + 
+  geom_histogram(bins = 20,alpha=0.8) +
+  ggtitle("Histogram of total number of steps each day") +
+  xlab("Total Steps a day") +
+  ylab("Occurences") +
+  scale_y_discrete() +
+  geom_vline(aes(xintercept = mean(total_steps),colour="Mean"),show.legend=TRUE) +
+  geom_vline(aes(xintercept = median(total_steps),colour="Median"),show.legend=TRUE) +
+  scale_colour_manual("Statistics",values=c("red","blue"))
+```
+
+3. Calculate and report the mean and median of the total number of steps taken per day
+```{r mean_median_steps_by_day,echo=TRUE}
+mean(steps_by_day$total_steps)
+median(steps_by_day$total_steps)
+```
 ## What is the average daily activity pattern?
-
 
 
 ## Imputing missing values
