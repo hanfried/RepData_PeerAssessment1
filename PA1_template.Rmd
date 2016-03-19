@@ -31,7 +31,17 @@ str(activity)
 library(dplyr,warn.conflicts = FALSE)
 library(lubridate)
 library(ggplot2)
-activity <- mutate(activity,date = ymd(date))
+library(reshape2)
+library(zoo)
+
+timestamped_activity <- activity %>%
+  mutate(hour = floor(interval/100),
+         minute = interval %% 100,
+         timestamp = ymd(date) + hours(hour) + minutes(minute),
+         interval_nr = 12*hour+minute/5)
+
+interval_nrs_2h <- 2*0:12*12
+labels_2h       <- c(sprintf("%i:00",2*0:12))
 ```
 
 ## What is mean total number of steps taken per day?
@@ -68,28 +78,30 @@ median(steps_by_day$total_steps)
 1, A time series plot of the 5 minute interval and the average number of steps taken, averaged across all days
 
 ```{r average_steps_by_interval,echo=TRUE}
-mean_steps_by_interval <- activity %>%
-  group_by(interval) %>%
-  summarize(average_steps = mean(steps,na.rm=TRUE))
+steps_by_interval <- timestamped_activity %>%
+  group_by(interval_nr) %>%
+  summarize(average_steps = mean(steps,na.rm=TRUE),
+            median_steps  = median(steps,na.rm=TRUE)) %>%
+  mutate(moving_avg_steps = rollapply(average_steps,5,mean,fill=NA,na.rm=TRUE,partial=TRUE))
 
 interval_with_most_steps <-
-  mean_steps_by_interval$interval[which.max(mean_steps_by_interval$average_steps)]
+  steps_by_interval$interval[which.max(steps_by_interval$average_steps)]
 
-ggplot(mean_steps_by_interval,aes(x = interval,y = average_steps)) +
+ggplot(steps_by_interval,aes(x = interval_nr,y = average_steps)) +
   geom_line() +
   ggtitle("Average steps by time of day") +
   xlab("Time of day") +
   ylab("Number of average steps") +
-  scale_x_discrete(breaks=c(200*0:12),labels=c(sprintf("%i:00",2*0:12))) +
+  scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
   geom_vline(aes(xintercept = interval_with_most_steps,colour="red"),
              linetype = 2,
              show.legend = FALSE) +
-  geom_label(aes(x = 1600,
-                 y = max(mean_steps_by_interval$average_steps),
+  geom_label(aes(x = 16*12,
+                 y = max(steps_by_interval$average_steps),
                  label = sprintf("5minute interval at %i:%0i has most steps on average",
-                                 floor(interval_with_most_steps/100),
-                                 interval_with_most_steps %% 100)),
-             show.legend = FALSE)
+                                 floor(interval_with_most_steps/12),
+                                 5* (interval_with_most_steps %% 12))),
+             show.legend = FALSE) 
 ```
 
 2. Wich 5-minute interval, on average across all the days, contains the maximum number of steps?
@@ -99,6 +111,93 @@ interval_with_most_steps
 
 ## Imputing missing values
 
+1. Calculate and report the total number of missing values in the dataset
+```{r report_missing_values,echo=TRUE}
+# Nr. of rows with NAs
+sum(!complete.cases(activity))
+```
 
+That's quite a lot, there are `r nrow(activity)` total rows in activity, 
+so `r sprintf("%.2f",100 * mean(!complete.cases(activity)))` percent of our datasets.
+
+2. Devise a strategy for filling in the missing values.
+
+Let's take a look to the distribution of missing values:
+```{r plot_missing_values,echo=TRUE}
+ggplot(timestamped_activity,aes(timestamp,!complete.cases(activity))) + 
+  geom_point() +
+  ggtitle("Distribution of missing data") +
+  xlab("") + ylab("") +
+  scale_y_discrete(labels=(c("Data available","Data missing")))
+  
+```
+
+So, there several larger chunks of missing data,
+but no individual small gaps that could be filled with something like a moving average or a simple regression. So I will take for every missing value an approximation based on the behaviour at the same interval on all other days. Let's take a look to possible candidates: average, median and moving average steps:
+```{r plot_impute_steps_candidates,echo=TRUE}
+ggplot(melt(steps_by_interval,"interval_nr"),
+      aes(interval_nr,value,group=variable,colour=factor(variable))) + 
+  geom_line() +
+  ggtitle("Comparison between imputing steps candidates") +
+  xlab("Time of day") +
+  ylab("Number of steps") +
+  scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
+  scale_y_sqrt() +
+  guides(color=guide_legend(title="Method")) +
+  geom_point(data = timestamped_activity %>% 
+                    dplyr::filter(!is.na(steps)) %>% 
+                    mutate(variable="raw measured steps"),
+             aes(interval_nr,steps),
+             alpha=0.05) 
+```
+  
+So, the median isn't a good choice to select a value for a 5 minute interval,
+as very often, there are 0 steps done in a 5 minute interval, so often, that the median is much lower and most of the time just 0 than on average.
+The average itself has the slight disadvantage that the average values jumps up+down from one 5minute interval to another. That is probably much due to random, so I take the moving average (window size 5) that looks decently smooth.
+
+3. Create a new dataset that is equal to the original dataset but with the missing data filled in
+```{r imputing_missing_values,echo=TRUE}
+imputed_activity <- inner_join(timestamped_activity,steps_by_interval,by=c("interval_nr")) %>%
+  mutate(steps = ifelse(is.na(steps),moving_avg_steps,steps))
+
+# Check whether all day filled:
+sum(!complete.cases(imputed_activity))
+```
+
+4. Make a histogram of the total number of steps taken each day and calculate and report the mean and median total number of steps taken per day.
+```{r histogram_imputed_steps_by_day}
+imputed_steps_by_day <- imputed_activity %>%
+  group_by(date) %>%
+  summarize(total_steps = sum(steps,na.rm=TRUE))
+
+ggplot(imputed_steps_by_day,aes(total_steps)) + 
+  geom_histogram(bins = 20,alpha=0.8) +
+  ggtitle("Histogram of total number of imputed steps each day") +
+  xlab("Total Steps a day") +
+  ylab("Occurences") +
+  scale_y_discrete() +
+  scale_colour_manual("Statistics",values=c("red","green","blue","yellow")) +
+  geom_vline(aes(xintercept = mean(imputed_steps_by_day$total_steps),
+             colour="Imputed Mean"),
+             show.legend=TRUE) +
+  geom_vline(aes(xintercept = mean(steps_by_day$total_steps),
+             colour="Original Mean"),
+             linetype=2,
+             show.legend = TRUE) +
+  geom_vline(aes(xintercept = median(imputed_steps_by_day$total_steps),
+             colour="Imputed Median"),
+             show.legend=TRUE) +
+  geom_vline(aes(xintercept = median(steps_by_day$total_steps),
+             colour="Original Median"),
+             linetype=2,
+             show.legend=TRUE)
+
+mean(imputed_steps_by_day$total_steps)
+median(imputed_steps_by_day$total_steps)
+```
+
+Just to compare, the mean of the original dataset was `r sprintf("%.2f",mean(steps_by_day$total_steps))`, the median of the original dataset was `r median(steps_by_day$total_steps)`.
+
+Now, the mean and median are close to be same and they are higher. The missing data leaded to have a lower calculation of total steps in a day, as if we assume we can impute the missing data.
 
 ## Are there differences in activity patterns between weekdays and weekends?
