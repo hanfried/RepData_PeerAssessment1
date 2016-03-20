@@ -29,7 +29,7 @@ str(activity)
 ```
 
 2. Process the data into a format suitable for your analysis
-```{r pre_process_the_data_into_suitable_format}
+```{r pre_process_the_data_into_suitable_format,echo=TRUE}
 library(dplyr,warn.conflicts = FALSE)
 library(lubridate)
 library(ggplot2)
@@ -95,7 +95,7 @@ ggplot(steps_by_interval,aes(x = interval_nr,y = average_steps)) +
   geom_line() +
   ggtitle("Average steps by time of day") +
   xlab("Time of day") +
-  ylab("Number of average steps") +
+  ylab("Number of average steps in 5min intervals") +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
   geom_vline(aes(xintercept = interval_nr_with_most_steps,colour="red"),
              linetype = 2,
@@ -144,7 +144,7 @@ ggplot(melt(steps_by_interval,"interval_nr"),
   geom_line() +
   ggtitle("Comparison between imputing steps candidates") +
   xlab("Time of day") +
-  ylab("Number of steps") +
+  ylab("Number of steps in 5min intervals") +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
   scale_y_sqrt() +
   guides(color=guide_legend(title="Method")) +
@@ -169,7 +169,7 @@ sum(!complete.cases(imputed_activity))
 ```
 
 4. Make a histogram of the total number of steps taken each day and calculate and report the mean and median total number of steps taken per day.
-```{r histogram_imputed_steps_by_day}
+```{r histogram_imputed_steps_by_day,echo=TRUE}
 imputed_steps_by_day <- imputed_activity %>%
   group_by(date) %>%
   summarize(total_steps = sum(steps,na.rm=TRUE))
@@ -209,7 +209,7 @@ Also, if we look to the original histogran, we've got a peak of days with steps 
 
 1. Create a new factor variable in the dataset with the two levels "weekday" and "weekend" indicating a given date is a weekday or weekend day
 
-```{r weekday_or_weekend_factor}
+```{r weekday_or_weekend_factor,echo=TRUE}
 timestamped_activity <- timestamped_activity %>%
   mutate(part_of_week = as.factor(ifelse(wday(date,label=TRUE) %in% c("Sat","Sun"),
                                      "weekend",
@@ -219,7 +219,7 @@ timestamped_activity <- timestamped_activity %>%
 ```
 
 2. Make a panel plot of the 5minute interval and average steps taken across all weekday and weekend days.
-```{r plot_average_steps_by_interval_faceted_by_weekpart}
+```{r plot_average_steps_by_interval_faceted_by_weekpart,echo=TRUE}
 steps_by_interval_and_part_of_week <- timestamped_activity %>%
   group_by(interval_nr,part_of_week) %>%
   summarize(average_steps = mean(steps,na.rm=TRUE))
@@ -230,16 +230,16 @@ ggplot(steps_by_interval_and_part_of_week,
   geom_line() +
   ggtitle("Average steps by time of day and part of the week") +
   xlab("Time of day") +
-  ylab("Number of average steps") +
+  ylab("Number of average steps in 5min intervals") +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
-  guides(color=guide_legend(title="Part of the week")) +
+  theme(legend.position="none") +
   facet_grid(part_of_week ~ .)
 ```
 
 O.K., I can see people don't stand up early at weekends as often before 8:00,
 but to make it easier to see, I'll overlap those graphs and smooth the much randomness slightly out by taking a moving average (window size 5):
 
-```{r plot_average_steps_by_interval_and_part_of_week_overlapped_and_smoothed_by_mov_avg}
+```{r plot_average_steps_by_interval_and_part_of_week_overlapped_and_smoothed,echo=TRUE}
 moving_avg_steps_weekday <- rollapply(
   dplyr::filter(steps_by_interval_and_part_of_week,part_of_week == "weekday")$average_steps,
   5,mean,fill=NA,na.rm=TRUE,partial=TRUE
@@ -261,7 +261,7 @@ ggplot(steps_by_interval_and_part_of_week_smoothed,
   geom_line() +
   ggtitle("Smoothed average steps by time of day and part of the week") +
   xlab("Time of day") +
-  ylab("Number of average steps (smoothed by moving average)") +
+  ylab("Number of average steps in 5min intervals (smoothed by moving average)") +
   guides(color=guide_legend(title="Part of the week")) +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h)
 ```

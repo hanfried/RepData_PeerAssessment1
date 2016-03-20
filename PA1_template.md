@@ -137,7 +137,7 @@ ggplot(steps_by_interval,aes(x = interval_nr,y = average_steps)) +
   geom_line() +
   ggtitle("Average steps by time of day") +
   xlab("Time of day") +
-  ylab("Number of average steps") +
+  ylab("Number of average steps in 5min intervals") +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
   geom_vline(aes(xintercept = interval_nr_with_most_steps,colour="red"),
              linetype = 2,
@@ -201,7 +201,7 @@ ggplot(melt(steps_by_interval,"interval_nr"),
   geom_line() +
   ggtitle("Comparison between imputing steps candidates") +
   xlab("Time of day") +
-  ylab("Number of steps") +
+  ylab("Number of steps in 5min intervals") +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
   scale_y_sqrt() +
   guides(color=guide_legend(title="Method")) +
@@ -312,9 +312,9 @@ ggplot(steps_by_interval_and_part_of_week,
   geom_line() +
   ggtitle("Average steps by time of day and part of the week") +
   xlab("Time of day") +
-  ylab("Number of average steps") +
+  ylab("Number of average steps in 5min intervals") +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h) +
-  guides(color=guide_legend(title="Part of the week")) +
+  theme(legend.position="none") +
   facet_grid(part_of_week ~ .)
 ```
 
@@ -346,12 +346,12 @@ ggplot(steps_by_interval_and_part_of_week_smoothed,
   geom_line() +
   ggtitle("Smoothed average steps by time of day and part of the week") +
   xlab("Time of day") +
-  ylab("Number of average steps (smoothed by moving average)") +
+  ylab("Number of average steps in 5min intervals (smoothed by moving average)") +
   guides(color=guide_legend(title="Part of the week")) +
   scale_x_discrete(breaks=interval_nrs_2h,labels=labels_2h)
 ```
 
-![](PA1_template_files/figure-html/plot_average_steps_by_interval_and_part_of_week_overlapped_and_smoothed_by_mov_avg-1.png)\
+![](PA1_template_files/figure-html/plot_average_steps_by_interval_and_part_of_week_overlapped_and_smoothed-1.png)\
 
 Now, all the trend is easy to catch.
 Not only are people waking up later in the weekend, obviously they are more active in terms of steps done most time of the day (beside 6-9 and 18-19).
